@@ -1,36 +1,58 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# GA Admin Dashboard
 
-## Getting Started
+Admin dashboard for managing orders, users, and payments from the GA Multilens database.
 
-First, run the development server:
+## Setup Instructions
+
+### 1. Install Dependencies
+
+```bash
+npm install
+```
+
+### 2. Configure Environment Variables
+
+Create a `.env.local` file in the root directory with the following:
+
+```env
+# MongoDB Configuration
+MONGO_URI=mongodb+srv://vacanzidev_db_user:Fxrzcgx34bTWNcIE@gamultilens.tuzaora.mongodb.net/gaMultilens?retryWrites=true&w=majority&appName=gaMultilens
+DATABASE_NAME=gaMultilens
+COLLECTION_NAME=accounts_login
+```
+
+### 3. Run the Development Server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Features
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **Dashboard**: Overview with statistics for orders, users, payments, and revenue
+- **Orders**: View all orders with details including payment status, order status, and cart items
+- **Users**: View all users from the accounts_login collection
+- **Payments**: View all payment transactions with status and amount details
 
-## Learn More
+## Pages
 
-To learn more about Next.js, take a look at the following resources:
+- `/` - Dashboard home with statistics
+- `/orders` - List of all orders
+- `/users` - List of all users
+- `/payments` - List of all payments
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Each page includes:
+- Data tables with key information
+- "View Details" button to see full JSON data for each record
+- Refresh button to reload data
+- Responsive design
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Database Collections
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The dashboard connects to the following MongoDB collections:
+- `orders` - Order information
+- `accounts_login` - User accounts
+- `payments` - Payment transactions
+"# ga-admin" 
