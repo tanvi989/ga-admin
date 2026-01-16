@@ -13,6 +13,15 @@ interface Order {
   total?: number;
   created?: string | Date;
   cart?: any[];
+  metadata?: {
+    customer_id?: string;
+    address?: string;
+    pres_0?: string;
+    pres_1?: string;
+    pres_2?: string;
+    pres_3?: string;
+    [key: string]: any;
+  };
   [key: string]: any;
 }
 
@@ -84,6 +93,20 @@ export default function OrdersPage() {
       return 'bg-red-100 text-red-800';
     }
     return 'bg-gray-100 text-gray-800';
+  };
+
+  // Function to get prescription for a specific cart item by index
+  const getPrescriptionForItem = (order: Order, itemIndex: number) => {
+    try {
+      // Get the prescription by index (pres_0, pres_1, etc.)
+      const prescriptionKey = `pres_${itemIndex}`;
+      if (order.metadata?.[prescriptionKey]) {
+        return JSON.parse(order.metadata[prescriptionKey]);
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
   };
 
   return (
@@ -255,30 +278,32 @@ export default function OrdersPage() {
                     {selectedOrder.cart?.map((item: any, idx: number) => {
                       const productData = item.product?.products || {};
                       const lensData = item.lens || {};
+                      const prescription = getPrescriptionForItem(selectedOrder, idx);
+                      
                       return (
                         <div key={idx} className="bg-white border border-[#e2e8f0] rounded-xl shadow-sm overflow-hidden">
                           <div className="bg-[#f1f5f9] px-6 py-3 border-b border-[#e2e8f0] flex justify-between items-center">
                             <span className="text-sm font-semibold text-[#0f172a]">Item {idx + 1} of {selectedOrder.cart?.length}: <strong className="ml-1">{item.name || productData.name} ({productData.brand || 'Multifolks'})</strong></span>
                             <span className="font-mono text-xs text-slate-500 uppercase tracking-widest">SKU: {productData.skuid || item.product_id}</span>
-                    </div>
+                          </div>
                           <div className="p-8">
                             <div className="grid grid-cols-1 md:grid-cols-12 gap-10">
                               {/* Images */}
                               <div className="md:col-span-4 lg:col-span-3 text-center space-y-4">
                                 <div className="p-4 bg-[#f8fafc] border border-[#e2e8f0] rounded-lg">
                                   <img src={item.image || productData.image} alt="Main" className="w-full h-40 object-contain drop-shadow-lg mx-auto" />
-                    </div>
+                                </div>
                                 <div className="flex gap-2 justify-center overflow-x-auto pb-2 scrollbar-hide">
                                   {productData.images?.slice(0, 4).map((img: string, i: number) => (
                                     <img key={i} src={img} className="w-10 h-10 object-contain border border-[#e2e8f0] rounded-md bg-white p-1" alt={`thumb-${i}`} />
                                   ))}
-                    </div>
+                                </div>
                                 <div className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mt-4">Added: {item.added_at || 'N/A'}</div>
-                    </div>
+                              </div>
 
                               {/* Specs */}
                               <div className="md:col-span-8 lg:col-span-9 space-y-8 text-left">
-                    <div>
+                                <div>
                                   <h3 className="text-lg font-bold text-[#0f172a] mb-4 border-b border-slate-100 pb-2">Physical Specifications</h3>
                                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
                                     <SpecItem label="Brand" value={productData.brand || 'Multifolks'} />
@@ -289,11 +314,11 @@ export default function OrdersPage() {
                                     <SpecItem label="Material" value={productData.material || 'Acetate'} />
                                     <SpecItem label="Gender" value={productData.gender || 'Unisex'} />
                                     <SpecItem label="Naming System" value={productData.naming_system} mono />
-                  </div>
-                </div>
+                                  </div>
+                                </div>
 
                                 {productData.comfort && (
-                  <div>
+                                  <div>
                                     <h3 className="text-lg font-bold text-[#0f172a] mb-3 border-b border-slate-100 pb-2">Comfort & Features</h3>
                                     <ul className="grid grid-cols-2 gap-2 text-sm text-slate-600 list-disc list-inside">
                                       {Array.isArray(productData.comfort) ? productData.comfort.map((c: string, i: number) => <li key={i}>{c}</li>) : <li>{productData.comfort}</li>}
@@ -323,7 +348,64 @@ export default function OrdersPage() {
                                           ))}
                                         </tbody>
                                       </table>
-                                </div>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* PRESCRIPTION DETAILS - NEW SECTION */}
+                                {prescription && (
+                                  <div className="bg-[#f3e8ff] border border-[#d8b4fe] rounded-xl p-6 relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 p-4 opacity-10">
+                                      <svg className="w-24 h-24 text-[#9333ea]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+                                    </div>
+                                    <h4 className="text-[#7e22ce] font-bold mb-4 flex items-center gap-2">
+                                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                      Prescription Details
+                                      <span className="px-2 py-1 rounded-full bg-[#9333ea] text-white text-xs">#{idx + 1}</span>
+                                    </h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                      <div>
+                                        <p className="text-xs text-slate-500 mb-2">Type:</p>
+                                        <p className="font-medium capitalize">{prescription.type}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-xs text-slate-500 mb-2">Product Name:</p>
+                                        <p className="font-medium">{prescription.name}</p>
+                                      </div>
+                                    </div>
+                                    
+                                    {prescription.type === 'upload' && prescription.url ? (
+                                      <div className="mt-4 space-y-4">
+                                        <div className="p-3 bg-white rounded-lg border border-[#e9d5ff]">
+                                          <p className="text-xs text-slate-500 mb-2">Uploaded Prescription:</p>
+                                          <a 
+                                            href={prescription.url} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="block"
+                                          >
+                                            <img 
+                                              src={prescription.url} 
+                                              alt={`Prescription for ${prescription.name}`} 
+                                              className="w-full h-32 object-contain border border-slate-200 rounded bg-white"
+                                            />
+                                          </a>
+                                          <p className="text-xs text-slate-600 mt-2">
+                                            Click image to view full size
+                                          </p>
+                                          <p className="text-xs text-slate-500 mt-1">
+                                            Cart ID: {item.cart_id}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="mt-4 p-3 bg-white rounded-lg border border-[#e9d5ff]">
+                                        <p className="text-xs text-slate-500 mb-2">Prescription Data:</p>
+                                        <pre className="text-xs text-slate-700 whitespace-pre-wrap">
+                                          {JSON.stringify(prescription, null, 2)}
+                                        </pre>
+                                      </div>
+                                    )}
                                   </div>
                                 )}
 
@@ -352,11 +434,11 @@ export default function OrdersPage() {
                                   </div>
                                 </div>
                               </div>
-                              </div>
                             </div>
                           </div>
-                        );
-                      })}
+                        </div>
+                      );
+                    })}
                   </div>
 
                   {/* RIGHT COLUMN: FINANCIAL & META (1fr equivalent) */}
@@ -414,7 +496,6 @@ export default function OrdersPage() {
                           try {
                             const meta = selectedOrder.metadata || {};
                             const addr = JSON.parse(meta.address || '{}');
-                            const cart = JSON.parse(meta.cart_summary || '{}');
                             return (
                               <>
                                 <div className="flex items-center gap-4 border-b border-slate-50 pb-4">
@@ -437,16 +518,26 @@ export default function OrdersPage() {
                                 </div>
 
                                 <div className="mt-6 pt-6 border-t-2 border-slate-100">
-                                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 text-left">Original Cart Snapshot</h4>
-                                  <table className="w-full text-[11px]">
-                                    <tbody className="space-y-2">
-                                      <FinancialRow label="Items Count" value={cart.items_count} plain />
-                                      <FinancialRow label="Subtotal" value={cart.subtotal} plain />
-                                      <FinancialRow label="Tax" value={cart.tax} plain />
-                                      <FinancialRow label="Discount" value={cart.discount} plain />
-                                      <FinancialRow label="Shipping (Est)" value={cart.shipping} plain />
-                                    </tbody>
-                                  </table>
+                                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 text-left">Prescription Mapping</h4>
+                                  <div className="space-y-2">
+                                    {(() => {
+                                      const prescriptions = [];
+                                      let index = 0;
+                                      while (selectedOrder.metadata?.[`pres_${index}`]) {
+                                        const presData = JSON.parse(selectedOrder.metadata[`pres_${index}`]);
+                                        const cartItem = selectedOrder.cart?.[index];
+                                        prescriptions.push(
+                                          <div key={index} className="p-2 bg-slate-50 rounded text-xs">
+                                            <p className="font-medium">pres_{index} → {presData.name}</p>
+                                            <p className="text-slate-500">Type: {presData.type}</p>
+                                            {cartItem && <p className="text-slate-500">Cart ID: {cartItem.cart_id}</p>}
+                                          </div>
+                                        );
+                                        index++;
+                                      }
+                                      return prescriptions.length > 0 ? prescriptions : <p className="text-xs text-slate-400 italic">No prescriptions found</p>;
+                                    })()}
+                                  </div>
                                 </div>
                               </>
                             );
@@ -465,15 +556,15 @@ export default function OrdersPage() {
                         <SpecItem label="Is Partial Order" value={String(selectedOrder.is_partial)} />
                         <SpecItem label="Customer Ref (Meta)" value={selectedOrder.metadata?.customer_id} mono muted />
                         <SpecItem label="Updated Record" value={formatDate(selectedOrder.updated)} small />
+                      </div>
                     </div>
-                  </div>
 
                     {/* Raw Metadata View */}
                     <div className="bg-white border border-[#e2e8f0] rounded-xl shadow-sm overflow-hidden">
                       <div className="bg-[#f1f5f9] px-4 py-3 border-b border-[#e2e8f0] font-bold text-[#0f172a] text-sm">Technical Data Hub</div>
                       <div className="p-4">
                         <div className="bg-[#1e293b] text-[#e2e8f0] p-4 rounded-lg text-[10px] font-mono whitespace-pre-wrap border border-[#334155] shadow-inner max-h-[300px] overflow-y-auto custom-scrollbar text-left">
-                      {JSON.stringify(selectedOrder, null, 2)}
+                          {JSON.stringify(selectedOrder, null, 2)}
                         </div>
                       </div>
                     </div>
@@ -531,6 +622,7 @@ function Badge({ label, value, color }: { label: string, value: string, color?: 
 }
 
 function DetailBlock({ label, value, primary, highlight, color, mono, small }: any) {
+  
   return (
     <div className={`p-4 rounded-2xl border border-gray-100 ${highlight ? color : 'bg-gray-50'}`}>
       <p className={`text-[9px] font-black uppercase tracking-widest mb-1 ${highlight ? 'text-current opacity-70' : 'text-gray-400'}`}>{label}</p>
@@ -540,4 +632,3 @@ function DetailBlock({ label, value, primary, highlight, color, mono, small }: a
     </div>
   );
 }
-
