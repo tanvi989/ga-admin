@@ -298,15 +298,16 @@ export default function ProductsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {products.map((product) => {
                 const skuid = product.skuid || product.sku || '';
-                const imagePatterns = [
-                  product.image,
+                // Fix: Ensure all values in the array are strings, not undefined
+                const imagePatterns: string[] = [
+                  product.image || '',
                   `https://storage.googleapis.com/myapp-image-bucket-001/Spexmojo_images/Spexmojo_images/${skuid}/${skuid}.png`,
                   `https://storage.googleapis.com/myapp-image-bucket-001/Faceaface/${skuid}/${skuid}.png`,
                   `https://storage.googleapis.com/myapp-image-bucket-001/Spexmojo_images/Spexmojo_images/${skuid}/${skuid}_1.png`,
                   `https://storage.googleapis.com/myapp-image-bucket-001/Faceaface/${skuid}/${skuid}_1.png`,
                   `https://storage.googleapis.com/myapp-image-bucket-001/Spexmojo_images/Spexmojo_images/${skuid}/${skuid}_2.png`,
                   `https://storage.googleapis.com/myapp-image-bucket-001/Faceaface/${skuid}/${skuid}_2.png`,
-                ].filter(Boolean);
+                ].filter(Boolean) as string[]; // Type assertion to ensure string[]
                 
                 return (
                   <div
@@ -388,8 +389,7 @@ export default function ProductsPage() {
               </div>
             )}
           </>
-        )
-}
+        )}
 
         {/* Add Product Form */}
         {showAddForm && (
@@ -605,8 +605,9 @@ function ProductForm({ formData, setFormData, onSave, onCancel, saving }: any) {
 
 function ProductDetails({ product, onVariantClick }: { product: Product, onVariantClick: (skuid: string) => void }) {
   const skuid = product.skuid || product.sku || '';
-  const imagePatterns = [
-    product.image,
+  // Fix: Ensure all values in the array are strings, not undefined
+  const imagePatterns: string[] = [
+    product.image || '',
     `https://storage.googleapis.com/myapp-image-bucket-001/Spexmojo_images/Spexmojo_images/${skuid}/${skuid}.png`,
     `https://storage.googleapis.com/myapp-image-bucket-001/Faceaface/${skuid}/${skuid}.png`,
     `https://storage.googleapis.com/myapp-image-bucket-001/Spexmojo_images/Spexmojo_images/${skuid}/${skuid}_1.png`,
@@ -614,10 +615,10 @@ function ProductDetails({ product, onVariantClick }: { product: Product, onVaria
     `https://storage.googleapis.com/myapp-image-bucket-001/Spexmojo_images/Spexmojo_images/${skuid}/${skuid}_2.png`,
     `https://storage.googleapis.com/myapp-image-bucket-001/Faceaface/${skuid}/${skuid}_2.png`,
     ...(product.images || [])
-  ].filter(Boolean);
+  ].filter(Boolean) as string[]; // Type assertion to ensure string[]
   
   // Generate dynamic thumbnails if images array is empty but we have a skuid
-  const displayImages = product.images && product.images.length > 0 
+  const displayImages: string[] = product.images && product.images.length > 0 
     ? product.images 
     : [
         `https://storage.googleapis.com/myapp-image-bucket-001/Spexmojo_images/Spexmojo_images/${skuid}/${skuid}.png`,
