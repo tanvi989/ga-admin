@@ -23,12 +23,16 @@ export async function GET(
     const collections = await db.listCollections().toArray();
     const collectionNames = collections.map(c => c.name);
 
-    if (collectionNames.includes('products')) {
+    const collectionName = collectionNames.includes('products') ? 'products' : 
+                           collectionNames.includes('product') ? 'product' : 
+                           collectionNames.includes('product_inventory') ? 'product_inventory' : null;
+
+    if (collectionName) {
       try {
-        product = await db.collection('products').findOne({ _id: new ObjectId(productId) });
+        product = await db.collection(collectionName).findOne({ _id: new ObjectId(productId) });
       } catch {
         // Try by skuid if ObjectId fails
-        product = await db.collection('products').findOne({ skuid: productId });
+        product = await db.collection(collectionName).findOne({ skuid: productId });
       }
     }
 
@@ -72,22 +76,26 @@ export async function PUT(
     const collections = await db.listCollections().toArray();
     const collectionNames = collections.map(c => c.name);
 
+    const collectionName = collectionNames.includes('products') ? 'products' : 
+                           collectionNames.includes('product') ? 'product' : 
+                           collectionNames.includes('product_inventory') ? 'product_inventory' : null;
+
     let result;
-    if (collectionNames.includes('products')) {
+    if (collectionName) {
       try {
-        result = await db.collection('products').updateOne(
+        result = await db.collection(collectionName).updateOne(
           { _id: new ObjectId(productId) },
           { $set: updateData }
         );
         if (result.matchedCount === 0) {
           // Try by skuid
-          result = await db.collection('products').updateOne(
+          result = await db.collection(collectionName).updateOne(
             { skuid: productId },
             { $set: updateData }
           );
         }
       } catch {
-        result = await db.collection('products').updateOne(
+        result = await db.collection(collectionName).updateOne(
           { skuid: productId },
           { $set: updateData }
         );
@@ -106,9 +114,9 @@ export async function PUT(
       );
     }
 
-    const updatedProduct = await db.collection('products').findOne(
+    const updatedProduct = await db.collection(collectionName).findOne(
       { _id: new ObjectId(productId) }
-    ) || await db.collection('products').findOne({ skuid: productId });
+    ) || await db.collection(collectionName).findOne({ skuid: productId });
 
     return NextResponse.json({
       success: true,
@@ -143,15 +151,19 @@ export async function DELETE(
     const collections = await db.listCollections().toArray();
     const collectionNames = collections.map(c => c.name);
 
+    const collectionName = collectionNames.includes('products') ? 'products' : 
+                           collectionNames.includes('product') ? 'product' : 
+                           collectionNames.includes('product_inventory') ? 'product_inventory' : null;
+
     let result;
-    if (collectionNames.includes('products')) {
+    if (collectionName) {
       try {
-        result = await db.collection('products').deleteOne({ _id: new ObjectId(productId) });
+        result = await db.collection(collectionName).deleteOne({ _id: new ObjectId(productId) });
         if (result.deletedCount === 0) {
-          result = await db.collection('products').deleteOne({ skuid: productId });
+          result = await db.collection(collectionName).deleteOne({ skuid: productId });
         }
       } catch {
-        result = await db.collection('products').deleteOne({ skuid: productId });
+        result = await db.collection(collectionName).deleteOne({ skuid: productId });
       }
     } else {
       return NextResponse.json(

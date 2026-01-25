@@ -7,6 +7,8 @@ export async function GET(request: Request) {
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '50');
     const search = searchParams.get('search') || '';
+    const gender = searchParams.get('gender') || '';
+    const sort = searchParams.get('sort') || '';
     const skip = (page - 1) * limit;
 
     // Check environment variable first
@@ -36,28 +38,54 @@ export async function GET(request: Request) {
         { title: { $regex: search, $options: 'i' } },
         { sku: { $regex: search, $options: 'i' } },
         { skuid: { $regex: search, $options: 'i' } },
-        { category: { $regex: search, $options: 'i' } }
+        { category: { $regex: search, $options: 'i' } },
+        { naming_system: { $regex: search, $options: 'i' } }
       ];
     }
 
-    if (collectionNames.includes('products')) {
-      const collection = db.collection('products');
-      totalCount = await collection.countDocuments(query);
-      products = await collection
-        .find(query)
-        .sort({ _id: -1 })
-        .skip(skip)
-        .limit(limit)
-        .toArray();
-    } else if (collectionNames.includes('product')) {
-      const collection = db.collection('product');
-      totalCount = await collection.countDocuments(query);
-      products = await collection
-        .find(query)
-        .sort({ _id: -1 })
-        .skip(skip)
-        .limit(limit)
-        .toArray();
+    if (gender) {
+      query.gender = gender;
+    }
+
+    if (collectionNames.includes('products') || collectionNames.includes('product') || collectionNames.includes('product_inventory')) {
+      const collectionName = collectionNames.includes('products') ? 'products' : 
+                             collectionNames.includes('product') ? 'product' : 'product_inventory';
+      const collection = db.collection(collectionName);
+      
+      // Use aggregation to deduplicate by skuid
+      let sortQuery: any = { _id: -1 };
+      if (sort === 'price_asc') sortQuery = { price: 1, _id: -1 };
+      if (sort === 'price_desc') sortQuery = { price: -1, _id: -1 };
+
+      const pipeline = [
+        { $match: query },
+        {
+          $addFields: {
+            price: { $convert: { input: "$price", to: "double", onError: 0, onNull: 0 } }
+          }
+        },
+        { $sort: sortQuery },
+        {
+          $group: {
+            _id: "$skuid",
+            doc: { $first: "$$ROOT" }
+          }
+        },
+        { $replaceRoot: { newRoot: "$doc" } },
+        { $sort: sortQuery }
+      ];
+
+      // Get total count for pagination (deduplicated)
+      const countPipeline = [...pipeline, { $count: "total" }];
+      const countResult = await collection.aggregate(countPipeline).toArray();
+      totalCount = countResult[0]?.total || 0;
+
+      // Get paginated results
+      products = await collection.aggregate([
+        ...pipeline,
+        { $skip: skip },
+        { $limit: limit }
+      ]).toArray();
     } else {
       // Extract products from orders (Fallback - slower)
       const orders = await db.collection('orders')

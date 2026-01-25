@@ -2,27 +2,67 @@
 
 import { useEffect, useState } from 'react';
 import AdminLayout from '@/components/AdminLayout';
+import Link from 'next/link';
 
 interface Product {
   _id: string;
+  skuid?: string;
   name?: string;
   title?: string;
+  brand?: string;
+  color_names?: string[];
+  comfort?: string[];
   description?: string;
+  gender?: string;
+  image?: string;
+  is_active?: boolean;
+  material?: string;
   price?: number;
   list_price?: number;
-  image?: string;
+  primary_category?: string;
+  secondary_category?: string;
+  size?: string;
+  style?: string;
+  updated_at?: string;
   images?: string[];
-  category?: string;
+  all_skuids?: string[];
+  frame_color?: string;
+  variants?: any[];
+  naming_system?: string;
+  shape?: string;
+  features?: string;
+  dimensions?: string;
+  dimensions_raw?: string;
+  dimensions_updated_at?: string;
   stock?: number;
   sku?: string;
-  skuid?: string;
-  brand?: string;
-  gender?: string;
-  material?: string;
-  style?: string;
   order_count?: number;
   total_quantity?: number;
   [key: string]: any;
+}
+
+function ProductImage({ patterns, alt, showPlaceholder = true }: { patterns: string[], alt: string, showPlaceholder?: boolean }) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [failed, setFailed] = useState(false);
+
+  if (failed || currentIndex >= patterns.length) {
+    return showPlaceholder ? <div className="text-4xl">📦</div> : null;
+  }
+
+  return (
+    <img
+      src={patterns[currentIndex]}
+      alt={alt}
+      className="max-w-full max-h-full object-contain group-hover:scale-110 transition-transform duration-500"
+      onError={() => {
+        if (currentIndex + 1 < patterns.length) {
+          setCurrentIndex(currentIndex + 1);
+        } else {
+          setFailed(true);
+        }
+      }}
+    />
+  );
 }
 
 export default function ProductsPage() {
@@ -34,6 +74,8 @@ export default function ProductsPage() {
   const [showEditForm, setShowEditForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [genderFilter, setGenderFilter] = useState('');
+  const [sortOrder, setSortOrder] = useState('');
   const [formData, setFormData] = useState<Partial<Product>>({});
   const [saving, setSaving] = useState(false);
   
@@ -54,12 +96,12 @@ export default function ProductsPage() {
 
   useEffect(() => {
     fetchProducts();
-  }, [page, debouncedSearch]);
+  }, [page, debouncedSearch, genderFilter, sortOrder]);
 
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/products?page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}`);
+      const response = await fetch(`/api/products?page=${page}&limit=${limit}&search=${encodeURIComponent(debouncedSearch)}&gender=${genderFilter}&sort=${sortOrder}`);
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         const text = await response.text();
@@ -148,6 +190,23 @@ export default function ProductsPage() {
     }
   };
 
+  const fetchProductBySku = async (skuid: string) => {
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/products/${skuid}`);
+      const data = await response.json();
+      if (data.success) {
+        setSelectedProduct(data.data);
+      } else {
+        alert('Failed to fetch variant: ' + data.error);
+      }
+    } catch (err: any) {
+      alert('Error fetching variant: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (loading && products.length === 0) {
     return (
       <AdminLayout>
@@ -164,12 +223,12 @@ export default function ProductsPage() {
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold text-gray-900">Products ({totalProducts})</h2>
           <div className="flex gap-2">
-            <button
-              onClick={handleAdd}
+            <Link
+              href="/products/add"
               className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
             >
               + Add Product
-            </button>
+            </Link>
             <button
               onClick={fetchProducts}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -185,15 +244,41 @@ export default function ProductsPage() {
           </div>
         )}
 
-        <div className="mb-6">
-          <input
-            type="text"
-            placeholder="Search products by name, SKU or category..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full md:w-1/3 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-          {loading && products.length > 0 && <span className="ml-4 text-sm text-gray-500">Updating...</span>}
+        <div className="mb-6 flex flex-col md:flex-row gap-4">
+          <div className="flex-1">
+            <input
+              type="text"
+              placeholder="Search products by name, SKU, category or naming system..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+          <div className="w-full md:w-48">
+            <select
+              value={genderFilter}
+              onChange={(e) => setGenderFilter(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none appearance-none bg-white font-medium text-sm"
+            >
+              <option value="">All Genders</option>
+              <option value="Men">Men</option>
+              <option value="Women">Women</option>
+              <option value="Unisex">Unisex</option>
+              <option value="Kids">Kids</option>
+            </select>
+          </div>
+          <div className="w-full md:w-48">
+            <select
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none appearance-none bg-white font-medium text-sm"
+            >
+              <option value="">Newest First</option>
+              <option value="price_asc">Price: Low to High</option>
+              <option value="price_desc">Price: High to Low</option>
+            </select>
+          </div>
+          {loading && products.length > 0 && <span className="flex items-center text-sm text-gray-500">Updating...</span>}
         </div>
 
         {products.length === 0 ? (
@@ -211,79 +296,73 @@ export default function ProductsPage() {
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {products.map((product) => (
-                <div
-                  key={product._id}
-                  className="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow overflow-hidden"
-                >
-                  {product.image || (product.images && product.images.length > 0 && product.images[0]) ? (
-                    <div className="h-48 bg-gray-200 overflow-hidden">
-                      <img
-                        src={product.image || (product.images && product.images[0]) || ''}
-                        alt={product.name || product.title || 'Product'}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none';
-                        }}
-                      />
-                    </div>
-                  ) : (
-                    <div className="h-48 bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center">
-                      <span className="text-4xl">📦</span>
-                    </div>
-                  )}
-                  
-                  <div className="p-4">
-                    <h3 className="font-semibold text-lg text-gray-900 mb-2 line-clamp-2">
-                      {product.name || product.title || 'Unnamed Product'}
-                    </h3>
-                    
-                    {product.description && (
-                      <p className="text-sm text-gray-600 mb-3 line-clamp-2">
-                        {product.description}
-                      </p>
-                    )}
-                    
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-xl font-bold text-blue-600">
-                        £{product.list_price || product.price || 0}
-                      </span>
-                      {product.stock !== undefined && (
-                        <span className={`text-sm px-2 py-1 rounded ${
-                          product.stock > 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+              {products.map((product) => {
+                const skuid = product.skuid || product.sku || '';
+                const imagePatterns = [
+                  product.image,
+                  `https://storage.googleapis.com/myapp-image-bucket-001/Spexmojo_images/Spexmojo_images/${skuid}/${skuid}.png`,
+                  `https://storage.googleapis.com/myapp-image-bucket-001/Faceaface/${skuid}/${skuid}.png`,
+                  `https://storage.googleapis.com/myapp-image-bucket-001/Spexmojo_images/Spexmojo_images/${skuid}/${skuid}_1.png`,
+                  `https://storage.googleapis.com/myapp-image-bucket-001/Faceaface/${skuid}/${skuid}_1.png`,
+                  `https://storage.googleapis.com/myapp-image-bucket-001/Spexmojo_images/Spexmojo_images/${skuid}/${skuid}_2.png`,
+                  `https://storage.googleapis.com/myapp-image-bucket-001/Faceaface/${skuid}/${skuid}_2.png`,
+                ].filter(Boolean);
+                
+                return (
+                  <div
+                    key={product._id}
+                    className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all overflow-hidden border border-gray-100 group"
+                  >
+                    <div className="h-56 bg-gray-50 overflow-hidden relative flex items-center justify-center p-4">
+                      <ProductImage patterns={imagePatterns} alt={product.name || product.title || 'Product'} />
+                      <div className="absolute top-3 right-3">
+                        <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-md shadow-sm ${
+                          product.is_active !== false ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
                         }`}>
-                          {product.stock > 0 ? `In Stock` : 'Out of Stock'}
+                          {product.is_active !== false ? 'Active' : 'Inactive'}
                         </span>
-                      )}
+                      </div>
                     </div>
                     
-                    {(product.sku || product.skuid) && (
-                      <p className="text-xs text-gray-500 mb-2">SKU: {product.sku || product.skuid}</p>
-                    )}
-                    
-                    <div className="flex gap-2 mt-4">
-                      <button
-                        onClick={() => setSelectedProduct(product)}
-                        className="flex-1 px-3 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
-                      >
-                        View
-                      </button>
-                      <button
-                        onClick={() => handleEdit(product)}
-                        className="flex-1 px-3 py-2 bg-yellow-600 text-white text-sm rounded hover:bg-yellow-700 transition-colors"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(product._id)}
-                        className="px-3 py-2 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors"
-                      >
-                        Delete
-                      </button>
+                    <div className="p-5">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="px-2 py-1 bg-slate-900 text-white rounded text-[10px] font-mono font-black tracking-widest">
+                          {skuid}
+                        </div>
+                        {product.naming_system && (
+                          <div className="px-2 py-1 bg-blue-50 rounded text-[10px] font-mono font-bold text-blue-600 truncate max-w-[120px]" title={product.naming_system}>
+                            {product.naming_system}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="mb-4">
+                        <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest leading-none mb-1">
+                          {product.brand || 'BERG'}
+                        </p>
+                        <h3 className="font-bold text-base text-gray-900 line-clamp-1 leading-tight">
+                          {product.name || product.title || 'Unnamed Product'}
+                        </h3>
+                      </div>
+                      
+                      <div className="flex justify-between items-end">
+                        <div>
+                          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-0.5">Retail Price</p>
+                          <span className="text-xl font-black text-gray-900 tracking-tighter">
+                            £{product.list_price || product.price || 0}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => setSelectedProduct(product)}
+                          className="px-4 py-2 bg-blue-600 text-white text-xs font-black rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"
+                        >
+                          DETAILS
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Pagination Controls */}
@@ -349,7 +428,7 @@ export default function ProductsPage() {
                   <button onClick={() => setSelectedProduct(null)} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
                 </div>
               </div>
-              <ProductDetails product={selectedProduct} />
+              <ProductDetails product={selectedProduct} onVariantClick={fetchProductBySku} />
             </div>
           </div>
         )}
@@ -360,180 +439,515 @@ export default function ProductsPage() {
 
 function ProductForm({ formData, setFormData, onSave, onCancel, saving }: any) {
   return (
-    <div className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
-        <input
-          type="text"
-          value={formData.name || formData.title || ''}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value, title: e.target.value })}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-          required
-        />
+    <div className="space-y-6 text-left">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Product Name *</label>
+            <input
+              type="text"
+              value={formData.name || formData.title || ''}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value, title: e.target.value })}
+              className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold text-sm"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Brand</label>
+            <input
+              type="text"
+              value={formData.brand || ''}
+              onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+              className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold text-sm"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Retail Price (£)</label>
+              <input
+                type="number"
+                step="0.01"
+                value={formData.list_price || formData.price || ''}
+                onChange={(e) => setFormData({ ...formData, list_price: parseFloat(e.target.value) || 0, price: parseFloat(e.target.value) || 0 })}
+                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Stock Level</label>
+              <input
+                type="number"
+                value={formData.stock || ''}
+                onChange={(e) => setFormData({ ...formData, stock: parseInt(e.target.value) || 0 })}
+                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold text-sm"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">SKU ID</label>
+            <input
+              type="text"
+              value={formData.skuid || formData.sku || ''}
+              onChange={(e) => setFormData({ ...formData, skuid: e.target.value, sku: e.target.value })}
+              className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-mono font-bold text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Naming System</label>
+            <input
+              type="text"
+              value={formData.naming_system || ''}
+              onChange={(e) => setFormData({ ...formData, naming_system: e.target.value })}
+              className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-mono font-bold text-sm"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Gender</label>
+              <select
+                value={formData.gender || ''}
+                onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold text-sm appearance-none"
+              >
+                <option value="">Select...</option>
+                <option value="Men">Men</option>
+                <option value="Women">Women</option>
+                <option value="Unisex">Unisex</option>
+                <option value="Kids">Kids</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Status</label>
+              <select
+                value={formData.is_active !== false ? 'true' : 'false'}
+                onChange={(e) => setFormData({ ...formData, is_active: e.target.value === 'true' })}
+                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold text-sm appearance-none"
+              >
+                <option value="true">Active</option>
+                <option value="false">Inactive</option>
+              </select>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Description</label>
         <textarea
           value={formData.description || ''}
           onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+          className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-medium text-sm min-h-[100px]"
           rows={3}
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Price (£)</label>
-          <input
-            type="number"
-            step="0.01"
-            value={formData.list_price || formData.price || ''}
-            onChange={(e) => setFormData({ ...formData, list_price: parseFloat(e.target.value) || 0, price: parseFloat(e.target.value) || 0 })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Stock</label>
-          <input
-            type="number"
-            value={formData.stock || ''}
-            onChange={(e) => setFormData({ ...formData, stock: parseInt(e.target.value) || 0 })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">SKU</label>
+          <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Material</label>
           <input
             type="text"
-            value={formData.sku || formData.skuid || ''}
-            onChange={(e) => setFormData({ ...formData, sku: e.target.value, skuid: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            value={formData.material || ''}
+            onChange={(e) => setFormData({ ...formData, material: e.target.value })}
+            className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold text-sm"
           />
         </div>
-
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+          <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Shape</label>
           <input
             type="text"
-            value={formData.category || ''}
-            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            value={formData.shape || ''}
+            onChange={(e) => setFormData({ ...formData, shape: e.target.value })}
+            className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold text-sm"
           />
         </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Brand</label>
+          <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Dimensions</label>
           <input
             type="text"
-            value={formData.brand || ''}
-            onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            value={formData.dimensions || ''}
+            onChange={(e) => setFormData({ ...formData, dimensions: e.target.value })}
+            className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-mono font-bold text-sm"
+            placeholder="e.g. 51-18-142-41"
           />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Gender</label>
-          <select
-            value={formData.gender || ''}
-            onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Select...</option>
-            <option value="Men">Men</option>
-            <option value="Women">Women</option>
-            <option value="Unisex">Unisex</option>
-          </select>
         </div>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Image URL</label>
+        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Primary Image URL</label>
         <input
           type="url"
           value={formData.image || ''}
           onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-          placeholder="https://example.com/image.jpg"
+          className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold text-xs"
+          placeholder="https://storage.googleapis.com/..."
         />
       </div>
 
-      <div className="flex justify-end gap-2 pt-4">
-        <button onClick={onCancel} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
-        <button onClick={onSave} disabled={saving} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50">
-          {saving ? 'Saving...' : 'Save Product'}
+      <div className="flex justify-end gap-3 pt-6 border-t border-gray-100">
+        <button onClick={onCancel} className="px-6 py-2 text-sm font-bold text-gray-500 hover:text-gray-700 transition-colors">Cancel</button>
+        <button 
+          onClick={onSave} 
+          disabled={saving} 
+          className="px-8 py-2 bg-blue-600 text-white text-sm font-black rounded-xl hover:bg-blue-700 disabled:opacity-50 shadow-lg shadow-blue-100 transition-all transform active:scale-95"
+        >
+          {saving ? 'Processing...' : 'Save Product Data'}
         </button>
       </div>
     </div>
   );
 }
 
-function ProductDetails({ product }: { product: Product }) {
+function ProductDetails({ product, onVariantClick }: { product: Product, onVariantClick: (skuid: string) => void }) {
+  const skuid = product.skuid || product.sku || '';
+  const imagePatterns = [
+    product.image,
+    `https://storage.googleapis.com/myapp-image-bucket-001/Spexmojo_images/Spexmojo_images/${skuid}/${skuid}.png`,
+    `https://storage.googleapis.com/myapp-image-bucket-001/Faceaface/${skuid}/${skuid}.png`,
+    `https://storage.googleapis.com/myapp-image-bucket-001/Spexmojo_images/Spexmojo_images/${skuid}/${skuid}_1.png`,
+    `https://storage.googleapis.com/myapp-image-bucket-001/Faceaface/${skuid}/${skuid}_1.png`,
+    `https://storage.googleapis.com/myapp-image-bucket-001/Spexmojo_images/Spexmojo_images/${skuid}/${skuid}_2.png`,
+    `https://storage.googleapis.com/myapp-image-bucket-001/Faceaface/${skuid}/${skuid}_2.png`,
+    ...(product.images || [])
+  ].filter(Boolean);
+  
+  // Generate dynamic thumbnails if images array is empty but we have a skuid
+  const displayImages = product.images && product.images.length > 0 
+    ? product.images 
+    : [
+        `https://storage.googleapis.com/myapp-image-bucket-001/Spexmojo_images/Spexmojo_images/${skuid}/${skuid}.png`,
+        `https://storage.googleapis.com/myapp-image-bucket-001/Faceaface/${skuid}/${skuid}.png`,
+        `https://storage.googleapis.com/myapp-image-bucket-001/Spexmojo_images/Spexmojo_images/${skuid}/${skuid}_1.png`,
+        `https://storage.googleapis.com/myapp-image-bucket-001/Faceaface/${skuid}/${skuid}_1.png`,
+        `https://storage.googleapis.com/myapp-image-bucket-001/Spexmojo_images/Spexmojo_images/${skuid}/${skuid}_2.png`,
+        `https://storage.googleapis.com/myapp-image-bucket-001/Faceaface/${skuid}/${skuid}_2.png`,
+        `https://storage.googleapis.com/myapp-image-bucket-001/Spexmojo_images/Spexmojo_images/${skuid}/${skuid}_3.png`,
+        `https://storage.googleapis.com/myapp-image-bucket-001/Faceaface/${skuid}/${skuid}_3.png`,
+        `https://storage.googleapis.com/myapp-image-bucket-001/Spexmojo_images/Spexmojo_images/${skuid}/${skuid}_4.png`,
+        `https://storage.googleapis.com/myapp-image-bucket-001/Faceaface/${skuid}/${skuid}_4.png`,
+        `https://storage.googleapis.com/myapp-image-bucket-001/Spexmojo_images/Spexmojo_images/${skuid}/${skuid}_5.png`,
+        `https://storage.googleapis.com/myapp-image-bucket-001/Faceaface/${skuid}/${skuid}_5.png`,
+      ];
+
+  // Helper to construct variant image URL
+  const getVariantImage = (v: any) => {
+    if (v.image) return v.image;
+    const vSkuid = v.skuid;
+    return `https://storage.googleapis.com/myapp-image-bucket-001/Spexmojo_images/Spexmojo_images/${vSkuid}/${vSkuid}.png`;
+  };
+
   return (
-    <div className="space-y-4">
-      {product.image || (product.images && product.images.length > 0 && product.images[0]) ? (
-        <img
-          src={product.image || (product.images && product.images[0]) || ''}
-          alt={product.name || product.title || 'Product'}
-          className="w-full h-64 object-cover rounded-lg"
-          onError={(e) => {
-            (e.target as HTMLImageElement).style.display = 'none';
-          }}
-        />
-      ) : null}
-      
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <h4 className="font-semibold text-gray-700 mb-1">Name</h4>
-          <p className="text-gray-900">{product.name || product.title || 'N/A'}</p>
+    <div className="space-y-8">
+      {/* Hero Section with Image Gallery */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="space-y-4 text-left">
+          <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 flex items-center justify-center h-80 overflow-hidden relative">
+            <ProductImage patterns={imagePatterns} alt={product.name || product.title || 'Product'} />
+            {product.is_active === false && (
+              <span className="absolute top-4 left-4 bg-red-600 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase shadow-lg">Inactive</span>
+            )}
+          </div>
+          <div className="grid grid-cols-4 gap-2">
+            {displayImages.slice(0, 8).map((img, i) => (
+              <div key={i} className="aspect-square bg-white border border-gray-100 rounded-xl p-1 hover:border-blue-400 transition-colors cursor-pointer overflow-hidden group">
+                <ProductImage 
+                  patterns={[img, img.replace('Spexmojo_images/Spexmojo_images', 'Faceaface'), img.replace('Faceaface', 'Spexmojo_images/Spexmojo_images')]} 
+                  alt={`thumb-${i}`} 
+                  showPlaceholder={false}
+                />
+              </div>
+            ))}
+          </div>
         </div>
-        <div>
-          <h4 className="font-semibold text-gray-700 mb-1">Price</h4>
-          <p className="text-gray-900 text-lg font-bold">£{product.list_price || product.price || 0}</p>
+
+        <div className="flex flex-col justify-between text-left">
+          <div>
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <h4 className="text-3xl font-black text-gray-900 tracking-tighter uppercase mb-1">{product.name || product.title || 'N/A'}</h4>
+                <div className="flex gap-2">
+                  <span className="px-2 py-0.5 bg-blue-100 text-blue-600 text-[10px] font-black rounded uppercase tracking-widest">{product.brand || 'BERG'}</span>
+                  <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-black rounded uppercase tracking-widest">{product.gender || 'Unisex'}</span>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className={`text-[10px] font-black uppercase px-2 py-1 rounded-md shadow-sm inline-block ${
+                  product.is_active !== false ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+                }`}>
+                  {product.is_active !== false ? 'Active' : 'Inactive'}
+                </p>
+              </div>
+            </div>
+
+            {/* 1. Color Variant Selector (Top Priority) */}
+            {product.variants && product.variants.length > 0 && (
+              <div className="mb-8 p-6 bg-gray-50 rounded-3xl border border-gray-100">
+                <div className="flex items-center gap-6">
+                  <span className="text-xs font-black text-[#8b5e3c] uppercase tracking-[0.2em] shrink-0">Color</span>
+                  <div className="flex flex-wrap gap-3">
+                    {product.variants.map((v: any, i: number) => {
+                      const isSelected = v.skuid === product.skuid;
+                      const colorMap: Record<string, string> = {
+                        'Black': '#000000',
+                        'Brown': '#8b4513',
+                        'White': '#ffffff',
+                        'Gray': '#808080',
+                        'Grey': '#808080',
+                        'Blue': '#0000ff',
+                        'Red': '#ff0000',
+                        'Gold': '#ffd700',
+                        'Silver': '#c0c0c0',
+                        'Tortoise': '#734822',
+                        'Havana': '#5d3a1a',
+                      };
+                      const colorName = v.color_names?.[0] || '';
+                      const colorHex = v.colors?.[0] || colorMap[colorName] || '#f1f5f9';
+                      const variantImage = getVariantImage(v);
+                      
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => !isSelected && onVariantClick(v.skuid)}
+                          className={`group relative flex items-center justify-center w-10 h-10 rounded-full transition-all ${
+                            isSelected 
+                              ? 'ring-2 ring-offset-2 ring-black scale-110 shadow-lg' 
+                              : 'hover:scale-110 hover:shadow-md'
+                          }`}
+                          title={colorName || v.skuid}
+                        >
+                          <div className="w-full h-full rounded-full border border-gray-200 shadow-inner overflow-hidden">
+                            <img 
+                              src={variantImage} 
+                              alt={colorName} 
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                const facePath = `https://storage.googleapis.com/myapp-image-bucket-001/Faceaface/${v.skuid}/${v.skuid}.png`;
+                                if (target.src !== facePath) {
+                                  target.src = facePath;
+                                } else {
+                                  target.style.display = 'none';
+                                  if (target.parentElement) {
+                                    target.parentElement.style.backgroundColor = colorHex;
+                                  }
+                                }
+                              }}
+                            />
+                          </div>
+                          {isSelected && (
+                            <div className="absolute inset-0 rounded-full border-2 border-white pointer-events-none"></div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <p className="text-[10px] font-bold text-[#8b5e3c] mt-3 uppercase tracking-tight opacity-70">
+                  Selected: {product.color_names?.[0] || product.frame_color || 'Original'}
+                </p>
+              </div>
+            )}
+
+            {/* 2. SKU ID & 3. Naming System */}
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-xl">
+                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">SKU Identifier</p>
+                <p className="text-base font-mono font-black text-white tracking-tighter">{product.skuid || product.sku}</p>
+              </div>
+              <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100">
+                <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-1">Naming System</p>
+                <p className="text-sm font-mono font-bold text-blue-700 truncate">{product.naming_system || 'N/A'}</p>
+              </div>
+            </div>
+
+            {/* 4. Price & Categories */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-center">
+                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Retail Price</p>
+                <p className="text-3xl font-black text-blue-600 tracking-tighter leading-none">£{product.list_price || product.price || 0}</p>
+              </div>
+              <div className="space-y-2">
+                <DataPoint label="Primary Category" value={product.primary_category} />
+                <DataPoint label="Secondary Category" value={product.secondary_category} />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100 mt-6">
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Product Description</p>
+            <p className="text-sm text-gray-600 leading-relaxed italic line-clamp-3">
+              {product.description || 'No description available for this premium frame.'}
+            </p>
+          </div>
         </div>
-        {product.description && (
-          <div className="col-span-2">
-            <h4 className="font-semibold text-gray-700 mb-1">Description</h4>
-            <p className="text-gray-900">{product.description}</p>
-          </div>
-        )}
-        {product.sku && (
-          <div>
-            <h4 className="font-semibold text-gray-700 mb-1">SKU</h4>
-            <p className="text-gray-900">{product.sku}</p>
-          </div>
-        )}
-        {product.category && (
-          <div>
-            <h4 className="font-semibold text-gray-700 mb-1">Category</h4>
-            <p className="text-gray-900">{product.category}</p>
-          </div>
-        )}
-        {product.brand && (
-          <div>
-            <h4 className="font-semibold text-gray-700 mb-1">Brand</h4>
-            <p className="text-gray-900">{product.brand}</p>
-          </div>
-        )}
-        {product.gender && (
-          <div>
-            <h4 className="font-semibold text-gray-700 mb-1">Gender</h4>
-            <p className="text-gray-900">{product.gender}</p>
-          </div>
-        )}
-        {product.stock !== undefined && (
-          <div>
-            <h4 className="font-semibold text-gray-700 mb-1">Stock</h4>
-            <p className="text-gray-900">{product.stock}</p>
-          </div>
-        )}
       </div>
+
+      {/* Technical Specifications Hub */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-left">
+        <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm">
+          <h5 className="text-sm font-black text-gray-900 uppercase tracking-widest mb-6 flex items-center gap-2">
+            <span className="w-1.5 h-4 bg-blue-600 rounded-full"></span>
+            Frame Attributes
+          </h5>
+          <div className="space-y-4">
+            <SpecRow label="Material" value={product.material} />
+            <SpecRow label="Style" value={product.style} />
+            <SpecRow label="Shape" value={product.shape} />
+            <SpecRow label="Size" value={product.size} />
+            <SpecRow label="Frame Color" value={product.frame_color || product.framecolor} />
+            <SpecRow label="Dimensions" value={product.dimensions || product.dimensions_raw} mono />
+          </div>
+        </div>
+
+        <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm">
+          <h5 className="text-sm font-black text-gray-900 uppercase tracking-widest mb-6 flex items-center gap-2">
+            <span className="w-1.5 h-4 bg-green-600 rounded-full"></span>
+            Comfort & Features
+          </h5>
+          <div className="space-y-4">
+            {product.comfort && product.comfort.length > 0 && (
+              <div>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Comfort Profile</p>
+                <div className="flex flex-wrap gap-2">
+                  {(Array.isArray(product.comfort) ? product.comfort : [product.comfort]).map((c: string, i: number) => (
+                    <span key={i} className="px-3 py-1 bg-green-50 text-green-700 rounded-lg text-[10px] font-bold border border-green-100 uppercase">
+                      {c}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="pt-4 border-t border-gray-50">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Technical Features</p>
+              <p className="text-xs text-gray-600 leading-relaxed">{product.features || 'Standard optical features apply.'}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm">
+          <h5 className="text-sm font-black text-gray-900 uppercase tracking-widest mb-6 flex items-center gap-2">
+            <span className="w-1.5 h-4 bg-purple-600 rounded-full"></span>
+            Inventory & Logistics
+          </h5>
+          <div className="space-y-4">
+            <SpecRow label="Stock Level" value={product.stock} />
+            <SpecRow label="Last Updated" value={product.updated_at ? new Date(product.updated_at).toLocaleDateString() : 'N/A'} />
+            <SpecRow label="Dim. Updated" value={product.dimensions_updated_at ? new Date(product.dimensions_updated_at).toLocaleDateString() : 'N/A'} />
+            <div className="pt-4 border-t border-gray-50">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Linked SKU Group</p>
+              <div className="flex flex-wrap gap-1">
+                {product.all_skuids?.map((id: string, i: number) => (
+                  <span key={i} className={`px-2 py-0.5 rounded font-mono text-[9px] border uppercase ${id === product.skuid ? 'bg-blue-600 text-white border-blue-700' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                    {id}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Variants Table */}
+      {product.variants && product.variants.length > 0 && (
+        <div className="bg-white border border-gray-100 rounded-3xl overflow-hidden shadow-sm text-left">
+          <div className="bg-gray-50 px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+            <h5 className="text-sm font-black text-gray-900 uppercase tracking-widest">Available Variants (Global)</h5>
+            <span className="text-[10px] font-bold text-slate-400">{product.variants.length} Options</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-xs text-left">
+              <thead className="bg-gray-50/50">
+                <tr>
+                  <th className="px-6 py-3 font-black text-gray-400 uppercase tracking-widest">SKU</th>
+                  <th className="px-6 py-3 font-black text-gray-400 uppercase tracking-widest">Color Way</th>
+                  <th className="px-6 py-3 font-black text-gray-400 uppercase tracking-widest text-right">Visual Preview</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {product.variants.map((v: any, i: number) => (
+                  <tr 
+                    key={i} 
+                    className={`cursor-pointer transition-colors ${v.skuid === product.skuid ? "bg-blue-50/30" : "hover:bg-gray-50/50"}`}
+                    onClick={() => v.skuid !== product.skuid && onVariantClick(v.skuid)}
+                  >
+                    <td className="px-6 py-4 font-mono font-bold text-slate-600 uppercase">{v.skuid}</td>
+                    <td className="px-6 py-4 font-bold text-slate-800">
+                      {v.color_names?.[0]} {v.skuid === product.skuid && <span className="ml-2 text-[9px] bg-blue-600 text-white px-2 py-0.5 rounded-full shadow-sm">CURRENT</span>}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-3">
+                        <div className="w-12 h-8 bg-white border border-gray-100 rounded p-0.5 shadow-sm">
+                          <img 
+                            src={getVariantImage(v)} 
+                            alt={v.skuid} 
+                            className="w-full h-full object-contain" 
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              const facePath = `https://storage.googleapis.com/myapp-image-bucket-001/Faceaface/${v.skuid}/${v.skuid}.png`;
+                              if (target.src !== facePath) {
+                                target.src = facePath;
+                              } else {
+                                target.style.display = 'none';
+                              }
+                            }}
+                          />
+                        </div>
+                        {v.colors?.[0] && (
+                          <div className="w-5 h-5 rounded-full border border-gray-200 shadow-inner" style={{ backgroundColor: v.colors[0] }} title={v.colors[0]}></div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Raw Metadata Debug View */}
+      <details className="group border border-gray-100 rounded-3xl overflow-hidden shadow-sm text-left">
+        <summary className="flex items-center justify-between cursor-pointer list-none p-6 bg-slate-900 text-white">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
+              <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
+            </div>
+            <div>
+              <p className="text-sm font-black tracking-tighter uppercase">Technical Data Hub</p>
+              <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Raw JSON Protocol Access</p>
+            </div>
+          </div>
+          <svg className="w-5 h-5 text-slate-500 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+        </summary>
+        <div className="p-6 bg-slate-950">
+          <pre className="text-[10px] text-green-400/80 font-mono leading-relaxed max-h-[400px] overflow-y-auto custom-scrollbar p-2">
+            {JSON.stringify(product, null, 2)}
+          </pre>
+        </div>
+      </details>
+    </div>
+  );
+}
+
+function DataPoint({ label, value, mono }: { label: string, value: any, mono?: boolean }) {
+  return (
+    <div className="bg-white p-4 rounded-2xl border border-gray-100">
+      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">{label}</p>
+      <p className={`text-xs font-bold text-gray-700 truncate ${mono ? 'font-mono' : ''}`}>{value || 'N/A'}</p>
+    </div>
+  );
+}
+
+function SpecRow({ label, value, mono }: { label: string, value: any, mono?: boolean }) {
+  return (
+    <div className="flex justify-between items-center border-b border-gray-50 pb-2 last:border-0">
+      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{label}</span>
+      <span className={`text-xs font-black text-gray-700 ${mono ? 'font-mono' : ''}`}>{value || 'N/A'}</span>
     </div>
   );
 }
