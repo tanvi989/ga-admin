@@ -13,6 +13,15 @@ interface Order {
   total?: number;
   created?: string | Date;
   cart?: any[];
+  metadata?: {
+    customer_id?: string;
+    address?: string;
+    pres_0?: string;
+    pres_1?: string;
+    pres_2?: string;
+    pres_3?: string;
+    [key: string]: any;
+  };
   [key: string]: any;
 }
 
@@ -21,7 +30,7 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  
+
   // Pagination state
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
@@ -86,6 +95,20 @@ export default function OrdersPage() {
     return 'bg-gray-100 text-gray-800';
   };
 
+  // Function to get prescription for a specific cart item by index
+  const getPrescriptionForItem = (order: Order, itemIndex: number) => {
+    try {
+      // Get the prescription by index (pres_0, pres_1, etc.)
+      const prescriptionKey = `pres_${itemIndex}`;
+      if (order.metadata?.[prescriptionKey]) {
+        return JSON.parse(order.metadata[prescriptionKey]);
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  };
+
   return (
     <AdminLayout>
       <div className="px-4 py-6 sm:px-0">
@@ -103,12 +126,12 @@ export default function OrdersPage() {
               <option value="Failed">Failed</option>
               <option value="Processing">Processing</option>
             </select>
-            <button
-              onClick={fetchOrders}
+          <button
+            onClick={fetchOrders}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
-            >
-              Refresh
-            </button>
+          >
+            Refresh
+          </button>
           </div>
         </div>
 
@@ -212,193 +235,204 @@ export default function OrdersPage() {
             <span className="text-sm text-gray-600">
               Page {page} of {totalPages}
             </span>
-            <button
+                <button
               onClick={() => setPage(p => Math.min(totalPages, p + 1))}
               disabled={page === totalPages || loading}
               className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 hover:bg-gray-50 text-sm"
-            >
+                >
               Next
-            </button>
-          </div>
+                </button>
+              </div>
         )}
 
         {selectedOrder && (
-          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" onClick={() => setSelectedOrder(null)}>
-            <div className="relative top-5 mx-auto p-0 border w-11/12 md:w-5/6 lg:w-3/4 shadow-2xl rounded-3xl bg-white max-h-[95vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-              {/* Modal Header */}
-              <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-10">
-                <div>
-                  <h3 className="text-2xl font-black text-gray-900 tracking-tighter">ORDER DETAILS</h3>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{selectedOrder.order_id || selectedOrder._id}</span>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-tighter ${getStatusColor(selectedOrder.order_status)}`}>
-                      {selectedOrder.order_status || 'N/A'}
-                    </span>
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm overflow-y-auto h-full w-full z-50 p-4 lg:p-8" onClick={() => setSelectedOrder(null)}>
+            <div className="relative mx-auto bg-[#f8fafc] w-full max-w-[1400px] shadow-2xl rounded-xl overflow-hidden flex flex-col min-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+              
+              {/* HEADER */}
+              <header className="px-8 py-6 bg-white border-b-2 border-[#e2e8f0] flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                  <h1 className="text-2xl font-bold text-[#0f172a]">
+                    Order Details: <span className="font-mono text-blue-600 tracking-tighter">{selectedOrder.order_id || selectedOrder._id}</span>
+                  </h1>
+                  <div className="flex gap-2 mt-2">
+                    <span className="px-2 py-1 rounded bg-[#dcfce7] text-[#166534] text-[10px] font-bold uppercase tracking-wider">{selectedOrder.order_status || 'Confirmed'}</span>
+                    <span className="px-2 py-1 rounded bg-[#fef3c7] text-[#92400e] text-[10px] font-bold uppercase tracking-wider">Payment: {selectedOrder.payment_status || 'Pending'}</span>
                   </div>
                 </div>
-                <button
-                  onClick={() => setSelectedOrder(null)}
-                  className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-all"
-                >
+                <div className="text-left md:text-right space-y-1">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Customer Email</p>
+                  <p className="font-mono font-bold text-[#0f172a] text-sm">{selectedOrder.customer_email || 'N/A'}</p>
+                  <p className="text-xs text-slate-500">Created: {formatDate(selectedOrder.created)} (UTC)</p>
+                    </div>
+                <button onClick={() => setSelectedOrder(null)} className="absolute top-4 right-4 md:static w-10 h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:text-red-500 transition-colors">
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
-              </div>
-              
-              <div className="p-8 overflow-y-auto space-y-10 custom-scrollbar">
-                {/* 1. Top Section: Customer & Financial Overview */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  {/* Customer Info Card */}
-                  <div className="lg:col-span-2 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-[2rem] p-8 text-white shadow-xl shadow-blue-100 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-8 opacity-10">
-                      <svg className="w-32 h-32" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-                    </div>
-                    <div className="relative z-10">
-                      <p className="text-blue-200 text-xs font-black uppercase tracking-widest mb-4">Customer Information</p>
-                      <h4 className="text-3xl font-bold truncate mb-2">
-                        {(() => {
-                          try {
-                            const addr = JSON.parse(selectedOrder.metadata?.address || '{}');
-                            return addr.fullName || selectedOrder.user_id || 'Guest User';
-                          } catch { return 'Guest User'; }
-                        })()}
-                      </h4>
-                      <div className="space-y-2 text-blue-100 font-medium">
-                        <p className="flex items-center gap-2">
-                          <svg className="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                          {selectedOrder.customer_email || 'No email provided'}
-                        </p>
-                        <p className="flex items-center gap-2">
-                          <svg className="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-                          {(() => {
-                            try {
-                              const addr = JSON.parse(selectedOrder.metadata?.address || '{}');
-                              return addr.mobile || 'No mobile provided';
-                            } catch { return 'No mobile provided'; }
-                          })()}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+              </header>
 
-                  {/* Financial Summary Card */}
-                  <div className="bg-gray-900 rounded-[2rem] p-8 text-white shadow-xl flex flex-col justify-between border border-gray-800">
-                    <div>
-                      <p className="text-gray-500 text-xs font-black uppercase tracking-widest mb-6">Payment Summary</p>
-                      <div className="space-y-4">
-                        <div className="flex justify-between items-center text-sm">
-                          <span className="text-gray-400">Subtotal</span>
-                          <span className="font-bold">£{selectedOrder.subtotal || selectedOrder.order_total || 0}</span>
-                        </div>
-                        {selectedOrder.discount_amount > 0 && (
-                          <div className="flex justify-between items-center text-sm">
-                            <span className="text-green-400 font-medium">Discount Applied</span>
-                            <span className="text-green-400 font-bold">- £{selectedOrder.discount_amount}</span>
-                          </div>
-                        )}
-                        <div className="flex justify-between items-center text-sm">
-                          <span className="text-gray-400">Shipping</span>
-                          <span className="font-bold">{selectedOrder.shipping_cost > 0 ? `£${selectedOrder.shipping_cost}` : 'FREE'}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="pt-6 border-t border-gray-800 mt-6">
-                      <div className="flex justify-between items-end">
-                        <span className="text-xs font-bold text-gray-500 uppercase">Total Paid</span>
-                        <span className="text-4xl font-black text-blue-500 tracking-tighter">£{selectedOrder.order_total || selectedOrder.total || 0}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. Detailed Cart Items */}
-                <div>
-                  <div className="flex items-center justify-between mb-6">
-                    <h4 className="text-xl font-black text-gray-900 tracking-tight">SHOPPING CART ({selectedOrder.cart?.length || 0})</h4>
-                    <span className="h-px flex-1 bg-gray-100 mx-6"></span>
-                  </div>
+              <div className="p-8 overflow-y-auto flex-1">
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
                   
-                  <div className="space-y-6">
+                  {/* LEFT COLUMN: PRODUCTS (3fr equivalent) */}
+                  <div className="lg:col-span-3 space-y-6">
                     {selectedOrder.cart?.map((item: any, idx: number) => {
                       const productData = item.product?.products || {};
                       const lensData = item.lens || {};
+                      const prescription = getPrescriptionForItem(selectedOrder, idx);
                       
                       return (
-                        <div key={idx} className="bg-white border border-gray-100 rounded-[2rem] overflow-hidden shadow-sm hover:shadow-md transition-all group">
-                          <div className="flex flex-col md:flex-row">
-                            {/* Product Image Gallery */}
-                            <div className="md:w-72 bg-gray-50 p-6 flex items-center justify-center relative group-hover:bg-blue-50/30 transition-colors">
-                              <img 
-                                src={item.image || productData.image} 
-                                alt={item.name} 
-                                className="w-full h-48 object-contain drop-shadow-2xl transform group-hover:scale-110 transition-transform duration-500"
-                              />
-                              <div className="absolute bottom-4 left-4 flex gap-1">
-                                <span className="px-2 py-1 bg-white/80 backdrop-blur-md rounded-lg text-[10px] font-black uppercase text-gray-600 shadow-sm border border-gray-100">
-                                  {productData.skuid || item.product_id}
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Product & Lens Technical Specs */}
-                            <div className="flex-1 p-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
-                              <div>
-                                <div className="flex items-start justify-between mb-2">
-                                  <h5 className="text-2xl font-black text-gray-900 leading-none">{item.name || productData.name}</h5>
-                                  <span className="text-lg font-black text-blue-600 tracking-tighter">£{item.price || productData.price}</span>
+                        <div key={idx} className="bg-white border border-[#e2e8f0] rounded-xl shadow-sm overflow-hidden">
+                          <div className="bg-[#f1f5f9] px-6 py-3 border-b border-[#e2e8f0] flex justify-between items-center">
+                            <span className="text-sm font-semibold text-[#0f172a]">Item {idx + 1} of {selectedOrder.cart?.length}: <strong className="ml-1">{item.name || productData.name} ({productData.brand || 'Multifolks'})</strong></span>
+                            <span className="font-mono text-xs text-slate-500 uppercase tracking-widest">SKU: {productData.skuid || item.product_id}</span>
+                          </div>
+                          <div className="p-8">
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-10">
+                              {/* Images */}
+                              <div className="md:col-span-4 lg:col-span-3 text-center space-y-4">
+                                <div className="p-4 bg-[#f8fafc] border border-[#e2e8f0] rounded-lg">
+                                  <img src={item.image || productData.image} alt="Main" className="w-full h-40 object-contain drop-shadow-lg mx-auto" />
                                 </div>
-                                <p className="text-sm text-gray-500 font-medium mb-6 leading-relaxed line-clamp-2">
-                                  {productData.description || 'Premium quality frame with customized lens configuration.'}
-                                </p>
-                                
-                                <div className="grid grid-cols-2 gap-4">
-                                  <div className="p-3 rounded-2xl bg-gray-50 border border-gray-100">
-                                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Material</p>
-                                    <p className="text-xs font-bold text-gray-700">{productData.material || 'Premium Acetate'}</p>
-                                  </div>
-                                  <div className="p-3 rounded-2xl bg-gray-50 border border-gray-100">
-                                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Frame Style</p>
-                                    <p className="text-xs font-bold text-gray-700">{productData.style || 'Standard'}</p>
-                                  </div>
-                                  <div className="p-3 rounded-2xl bg-gray-50 border border-gray-100">
-                                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Color Way</p>
-                                    <p className="text-xs font-bold text-gray-700">{productData.framecolor || 'Original'}</p>
-                                  </div>
-                                  <div className="p-3 rounded-2xl bg-gray-50 border border-gray-100">
-                                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Frame Size</p>
-                                    <p className="text-xs font-bold text-gray-700 uppercase">{productData.size || 'Medium'}</p>
-                                  </div>
+                                <div className="flex gap-2 justify-center overflow-x-auto pb-2 scrollbar-hide">
+                                  {productData.images?.slice(0, 4).map((img: string, i: number) => (
+                                    <img key={i} src={img} className="w-10 h-10 object-contain border border-[#e2e8f0] rounded-md bg-white p-1" alt={`thumb-${i}`} />
+                                  ))}
                                 </div>
+                                <div className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mt-4">Added: {item.added_at || 'N/A'}</div>
                               </div>
 
-                              {/* Lens Configuration Detail */}
-                              <div className="bg-blue-50/50 rounded-3xl p-6 border border-blue-100/50 relative">
-                                <div className="absolute -top-3 -right-3 w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-200">
-                                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                                </div>
-                                <h6 className="text-sm font-black text-blue-900 uppercase tracking-widest mb-4">Lens Configuration</h6>
-                                <div className="space-y-4">
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-xs font-bold text-blue-400 uppercase">Category</span>
-                                    <span className="text-sm font-black text-blue-900">{lensData.main_category || 'N/A'}</span>
-                                  </div>
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-xs font-bold text-blue-400 uppercase">Type</span>
-                                    <span className="text-sm font-black text-blue-900">{lensData.sub_category || 'N/A'}</span>
-                                  </div>
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-xs font-bold text-blue-400 uppercase">Coating</span>
-                                    <span className="text-sm font-black text-blue-900">{lensData.coating || 'Standard'}</span>
-                                  </div>
-                                  <div className="pt-3 border-t border-blue-100 flex justify-between items-center">
-                                    <span className="text-xs font-black text-blue-600 uppercase">Configuration Cost</span>
-                                    <span className="text-lg font-black text-blue-600 tracking-tighter">£{lensData.selling_price || 0}</span>
+                              {/* Specs */}
+                              <div className="md:col-span-8 lg:col-span-9 space-y-8 text-left">
+                                <div>
+                                  <h3 className="text-lg font-bold text-[#0f172a] mb-4 border-b border-slate-100 pb-2">Physical Specifications</h3>
+                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+                                    <SpecItem label="Brand" value={productData.brand || 'Multifolks'} />
+                                    <SpecItem label="Frame Color" value={`${productData.frame_color || productData.framecolor || 'N/A'}`} />
+                                    <SpecItem label="Shape" value={productData.shape || 'Square'} />
+                                    <SpecItem label="Size" value={productData.size || 'M (Medium)'} />
+                                    <SpecItem label="Style" value={productData.style || 'Standard'} />
+                                    <SpecItem label="Material" value={productData.material || 'Acetate'} />
+                                    <SpecItem label="Gender" value={productData.gender || 'Unisex'} />
+                                    <SpecItem label="Naming System" value={productData.naming_system} mono />
                                   </div>
                                 </div>
-                                {item.flag === 'instant' && (
-                                  <div className="mt-4 px-3 py-1 bg-indigo-600 text-white text-[10px] font-black rounded-full uppercase tracking-tighter inline-block shadow-md">
-                                    ⚡ Instant Buy Enabled
+
+                                {productData.comfort && (
+                                  <div>
+                                    <h3 className="text-lg font-bold text-[#0f172a] mb-3 border-b border-slate-100 pb-2">Comfort & Features</h3>
+                                    <ul className="grid grid-cols-2 gap-2 text-sm text-slate-600 list-disc list-inside">
+                                      {Array.isArray(productData.comfort) ? productData.comfort.map((c: string, i: number) => <li key={i}>{c}</li>) : <li>{productData.comfort}</li>}
+                                    </ul>
                                   </div>
                                 )}
+
+                                {productData.variants && productData.variants.length > 0 && (
+                                  <div>
+                                    <h3 className="text-lg font-bold text-[#0f172a] mb-3 border-b border-slate-100 pb-2">Available Variants (Global)</h3>
+                                    <div className="overflow-x-auto">
+                                      <table className="min-w-full text-xs text-left">
+                                        <thead className="bg-[#f8fafc]">
+                                          <tr>
+                                            <th className="px-4 py-2 border-b border-[#e2e8f0]">SKU</th>
+                                            <th className="px-4 py-2 border-b border-[#e2e8f0]">Color Name</th>
+                                            <th className="px-4 py-2 border-b border-[#e2e8f0]">Hex</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {productData.variants.map((v: any, i: number) => (
+                                            <tr key={i} className={v.skuid === productData.skuid ? "bg-[#f0fdf4]" : ""}>
+                                              <td className="px-4 py-2 border-b border-slate-50 font-mono">{v.skuid}</td>
+                                              <td className="px-4 py-2 border-b border-slate-50">{v.color_names?.[0]} {v.skuid === productData.skuid && "(Selected)"}</td>
+                                              <td className="px-4 py-2 border-b border-slate-50">{v.colors?.[0] || 'N/A'}</td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* PRESCRIPTION DETAILS - NEW SECTION */}
+                                {prescription && (
+                                  <div className="bg-[#f3e8ff] border border-[#d8b4fe] rounded-xl p-6 relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 p-4 opacity-10">
+                                      <svg className="w-24 h-24 text-[#9333ea]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+                                    </div>
+                                    <h4 className="text-[#7e22ce] font-bold mb-4 flex items-center gap-2">
+                                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                      Prescription Details
+                                      <span className="px-2 py-1 rounded-full bg-[#9333ea] text-white text-xs">#{idx + 1}</span>
+                                    </h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                      <div>
+                                        <p className="text-xs text-slate-500 mb-2">Type:</p>
+                                        <p className="font-medium capitalize">{prescription.type}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-xs text-slate-500 mb-2">Product Name:</p>
+                                        <p className="font-medium">{prescription.name}</p>
+                                      </div>
+                                    </div>
+                                    
+                                    {prescription.type === 'upload' && prescription.url ? (
+                                      <div className="mt-4 space-y-4">
+                                        <div className="p-3 bg-white rounded-lg border border-[#e9d5ff]">
+                                          <p className="text-xs text-slate-500 mb-2">Uploaded Prescription:</p>
+                                          <a 
+                                            href={prescription.url} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="block"
+                                          >
+                                            <img 
+                                              src={prescription.url} 
+                                              alt={`Prescription for ${prescription.name}`} 
+                                              className="w-full h-32 object-contain border border-slate-200 rounded bg-white"
+                                            />
+                                          </a>
+                                          <p className="text-xs text-slate-600 mt-2">
+                                            Click image to view full size
+                                          </p>
+                                          <p className="text-xs text-slate-500 mt-1">
+                                            Cart ID: {item.cart_id}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="mt-4 p-3 bg-white rounded-lg border border-[#e9d5ff]">
+                                        <p className="text-xs text-slate-500 mb-2">Prescription Data:</p>
+                                        <pre className="text-xs text-slate-700 whitespace-pre-wrap">
+                                          {JSON.stringify(prescription, null, 2)}
+                                        </pre>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+
+                                {/* Lens Breakdown */}
+                                <div className="bg-[#eff6ff] border border-[#bfdbfe] rounded-xl p-6 relative overflow-hidden">
+                                  <div className="absolute top-0 right-0 p-4 opacity-10">
+                                    <svg className="w-24 h-24 text-blue-600" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+                                  </div>
+                                  <h4 className="text-[#1e40af] font-bold mb-4 flex items-center gap-2">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                                    Lens Configuration
+                                  </h4>
+                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 mb-6">
+                                    <SpecItem label="Lens Category" value={lensData.main_category || 'N/A'} />
+                                    <SpecItem label="Package Index" value={lensData.lens_package || '1.56'} />
+                                    <SpecItem label="Type" value={lensData.sub_category || 'N/A'} />
+                                    <SpecItem label="Coating" value={lensData.coating || 'Standard'} />
+                                  </div>
+                                  <div className="space-y-2 border-t border-blue-200 pt-4">
+                                    <div className="flex justify-between text-sm"><span className="text-slate-500 italic">Lens Base Price:</span> <span className="font-bold text-[#1e3a8a]">£{lensData.price || lensData.selling_price || 0}.00</span></div>
+                                    <div className="flex justify-between text-sm"><span className="text-slate-500 italic">Coating Price:</span> <span className="font-bold text-[#1e3a8a]">£{lensData.coating_price || 0}.00</span></div>
+                                    <div className="flex justify-between pt-2 border-t border-blue-200 font-bold text-[#1e3a8a]">
+                                      <span>Item Total (Qty {item.quantity || 1}):</span> 
+                                      <span className="text-lg tracking-tighter">£{(item.price || productData.price || 0) + (lensData.selling_price || 0)}.00</span>
+                                    </div>
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -406,89 +440,136 @@ export default function OrdersPage() {
                       );
                     })}
                   </div>
-                </div>
 
-                {/* 3. Logistics & Technical View */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  <div className="bg-white rounded-[2rem] p-8 border border-gray-100 shadow-sm">
-                    <h4 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-tight">Shipping & Logistics</h4>
-                    <div className="space-y-6">
-                      <div className="flex items-start gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 shrink-0">
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Shipping Destination</p>
-                          <p className="text-sm font-bold text-gray-700 leading-relaxed italic">{selectedOrder.shipping_address || 'Av. dos Andradas, 3000, Belo Horizonte, MG'}</p>
+                  {/* RIGHT COLUMN: FINANCIAL & META (1fr equivalent) */}
+                  <div className="lg:col-span-1 space-y-6 text-left">
+                    
+                    {/* Financials */}
+                    <div className="bg-white border border-[#e2e8f0] rounded-xl shadow-sm overflow-hidden">
+                      <div className="bg-[#f1f5f9] px-4 py-3 border-b border-[#e2e8f0] font-bold text-[#0f172a] text-sm">Financial Breakdown</div>
+                      <div className="p-6">
+                        <table className="w-full text-xs">
+                          <tbody className="space-y-3">
+                            <FinancialRow label="Subtotal" value={`£${selectedOrder.subtotal || 0}.00`} />
+                            <FinancialRow label="Discount Amount" value={`-£${selectedOrder.discount_amount || 0}.00`} success />
+                            <FinancialRow label="Shipping Cost" value={`£${selectedOrder.shipping_cost || 0}.00`} />
+                            <FinancialRow label="Lens Discount" value={`£${selectedOrder.lens_discount || 0}.00`} />
+                            <FinancialRow label="Retailer Lens Disc." value={`£${selectedOrder.retailer_lens_discount || 0}.00`} />
+                            <tr className="bg-[#f1f5f9] font-bold"><td className="px-3 py-2 rounded-l-lg">Total Payable</td><td className="px-3 py-2 rounded-r-lg text-right font-mono">£{selectedOrder.order_total || selectedOrder.total || 0}.00</td></tr>
+                          </tbody>
+                        </table>
+                        <div className="mt-6 space-y-4 border-t border-slate-100 pt-4">
+                          <SpecItem label="Payment Mode" value={selectedOrder.pay_mode || 'Stripe / Online'} />
+                          <SpecItem label="Trans. ID" value={selectedOrder.transaction_id} mono muted />
+                          <SpecItem label="Intent ID" value={selectedOrder.payment_intent_id} mono muted />
                         </div>
                       </div>
-                      
-                      <div className="flex items-start gap-4 p-4 rounded-2xl bg-blue-50/30 border border-blue-100/50">
-                        <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">Logistics Partner</p>
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm font-bold text-blue-900">BlueDart Global Express</p>
-                            <span className="px-2 py-0.5 bg-green-100 text-green-700 text-[9px] font-black rounded uppercase">Active</span>
+                    </div>
+
+                    {/* Address & Meta */}
+                    <div className="bg-white border border-[#e2e8f0] rounded-xl shadow-sm overflow-hidden">
+                      <div className="bg-[#f1f5f9] px-4 py-3 border-b border-[#e2e8f0] font-bold text-[#0f172a] text-sm">Shipping & Billing</div>
+                      <div className="p-6 space-y-6">
+                        <div>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Shipping Destination</p>
+                          <div className="p-4 bg-[#f8fafc] border border-slate-100 rounded-lg text-xs font-mono leading-relaxed text-[#0f172a]">
+                            {selectedOrder.shipping_address || 'N/A'}
                           </div>
-                          {selectedOrder.awb_number && (
-                            <div className="mt-2 pt-2 border-t border-blue-100">
-                              <p className="text-xs font-mono font-bold text-blue-600 tracking-tighter">AWB: {selectedOrder.awb_number}</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-white rounded-[2rem] p-8 border border-gray-100 shadow-sm">
-                    <h4 className="text-lg font-black text-gray-900 mb-6 uppercase tracking-tight">System Metadata</h4>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100">
-                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Pay Mode</p>
-                        <p className="text-xs font-bold text-gray-700">{selectedOrder.pay_mode || 'Online Payment'}</p>
-                      </div>
-                      <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100">
-                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Partial Paid</p>
-                        <p className="text-xs font-bold text-gray-700">{selectedOrder.is_partial ? 'Enabled' : 'Disabled'}</p>
-                      </div>
-                      <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100">
-                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Created At</p>
-                        <p className="text-xs font-bold text-gray-700">{formatDate(selectedOrder.created)}</p>
-                      </div>
-                      <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100">
-                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Last Update</p>
-                        <p className="text-xs font-bold text-gray-700">{formatDate(selectedOrder.updated)}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 4. Raw Metadata Debug View */}
-                <div className="border-t border-dashed border-gray-200 pt-10 pb-4">
-                  <details className="group">
-                    <summary className="flex items-center justify-between cursor-pointer list-none p-6 bg-gray-900 rounded-[2rem] text-white hover:bg-black transition-all shadow-2xl">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center">
-                          <svg className="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
                         </div>
                         <div>
-                          <p className="text-lg font-black tracking-tighter">TECHNICAL DATA HUB</p>
-                          <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Advanced Raw JSON Access</p>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Billing Address</p>
+                          <div className="p-4 bg-[#f8fafc] border border-slate-100 rounded-lg text-xs font-mono leading-relaxed text-[#0f172a]">
+                            {selectedOrder.billing_address || 'N/A'}
+                          </div>
                         </div>
                       </div>
-                      <div className="w-10 h-10 rounded-full border border-white/20 flex items-center justify-center group-open:rotate-180 transition-transform">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" /></svg>
-                      </div>
-                    </summary>
-                    <div className="mt-4 p-8 bg-gray-950 rounded-[2.5rem] overflow-x-auto shadow-inner border border-white/5">
-                      <pre className="text-[12px] text-green-400/80 font-mono leading-relaxed custom-scrollbar">
-                        {JSON.stringify(selectedOrder, null, 2)}
-                      </pre>
                     </div>
-                  </details>
+
+                    {/* DETAILED METADATA */}
+                    <div className="bg-white border border-l-4 border-l-[#3b82f6] border-[#e2e8f0] rounded-xl shadow-sm overflow-hidden">
+                      <div className="bg-[#f1f5f9] px-4 py-3 border-b border-[#e2e8f0] flex justify-between items-center">
+                        <span className="font-bold text-[#0f172a] text-sm">Customer Metadata</span>
+                        <span className="px-2 py-0.5 rounded bg-[#dbeafe] text-[#1e40af] text-[9px] font-bold uppercase">Parsed</span>
+                      </div>
+                      <div className="p-6 space-y-6">
+                        {(() => {
+                          try {
+                            const meta = selectedOrder.metadata || {};
+                            const addr = JSON.parse(meta.address || '{}');
+                            return (
+                              <>
+                                <div className="flex items-center gap-4 border-b border-slate-50 pb-4">
+                                  <div className="w-12 h-12 rounded-full bg-[#3b82f6] text-white flex items-center justify-center font-bold text-xl shadow-lg shadow-blue-100">
+                                    {addr.fullName?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase() || 'JS'}
+                                  </div>
+                                  <div className="text-left">
+                                    <div className="text-sm font-bold text-[#0f172a] leading-none mb-1">{addr.fullName || 'João Souza Silva'}</div>
+                                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{addr.addressType || 'Home Address'}</div>
+                                  </div>
+                                </div>
+                                
+                                <div className="space-y-2 text-xs">
+                                  <p className="flex justify-between"><strong>Mobile:</strong> <span className="font-mono">{addr.mobile || 'N/A'}</span></p>
+                                  <p className="flex justify-between border-t border-slate-50 pt-2"><strong className="text-slate-400">Email:</strong> <span className="text-slate-400 italic">Not provided in meta</span></p>
+                                  <p className="border-t border-slate-50 pt-2"><strong>Street:</strong> <br/><span className="text-slate-600 inline-block mt-1">{addr.addressLine}</span></p>
+                                  <p className="border-t border-slate-50 pt-2"><strong>City/State/Zip:</strong> <br/><span className="text-slate-600 inline-block mt-1">{addr.city}, {addr.state}, {addr.zip}</span></p>
+                                  <p className="flex justify-between border-t border-slate-50 pt-2"><strong>Country:</strong> <span>{addr.country}</span></p>
+                                  <p className="flex justify-between border-t border-slate-50 pt-2"><strong>Is Default:</strong> <span className="uppercase font-bold text-[10px]">{String(addr.isDefaultAddress)}</span></p>
+                                </div>
+
+                                <div className="mt-6 pt-6 border-t-2 border-slate-100">
+                                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 text-left">Prescription Mapping</h4>
+                                  <div className="space-y-2">
+                                    {(() => {
+                                      const prescriptions = [];
+                                      let index = 0;
+                                      while (selectedOrder.metadata?.[`pres_${index}`]) {
+                                        const presData = JSON.parse(selectedOrder.metadata[`pres_${index}`]);
+                                        const cartItem = selectedOrder.cart?.[index];
+                                        prescriptions.push(
+                                          <div key={index} className="p-2 bg-slate-50 rounded text-xs">
+                                            <p className="font-medium">pres_{index} → {presData.name}</p>
+                                            <p className="text-slate-500">Type: {presData.type}</p>
+                                            {cartItem && <p className="text-slate-500">Cart ID: {cartItem.cart_id}</p>}
+                                          </div>
+                                        );
+                                        index++;
+                                      }
+                                      return prescriptions.length > 0 ? prescriptions : <p className="text-xs text-slate-400 italic">No prescriptions found</p>;
+                                    })()}
+                                  </div>
+                                </div>
+                              </>
+                            );
+                          } catch (e) { return <p className="text-xs text-red-400 italic">Parsing Error: {String(e)}</p>; }
+                        })()}
+                      </div>
+                    </div>
+
+                    {/* Technical IDs */}
+                    <div className="bg-white border border-[#e2e8f0] rounded-xl shadow-sm overflow-hidden">
+                      <div className="bg-[#f1f5f9] px-4 py-3 border-b border-[#e2e8f0] font-bold text-[#0f172a] text-sm">System Data</div>
+                      <div className="p-6 space-y-4">
+                        <SpecItem label="Order ID" value={selectedOrder.order_id} mono />
+                        <SpecItem label="Database _id" value={selectedOrder._id} mono small />
+                        <SpecItem label="User Internal ID" value={selectedOrder.user_id} mono small />
+                        <SpecItem label="Is Partial Order" value={String(selectedOrder.is_partial)} />
+                        <SpecItem label="Customer Ref (Meta)" value={selectedOrder.metadata?.customer_id} mono muted />
+                        <SpecItem label="Updated Record" value={formatDate(selectedOrder.updated)} small />
+                      </div>
+                    </div>
+
+                    {/* Raw Metadata View */}
+                    <div className="bg-white border border-[#e2e8f0] rounded-xl shadow-sm overflow-hidden">
+                      <div className="bg-[#f1f5f9] px-4 py-3 border-b border-[#e2e8f0] font-bold text-[#0f172a] text-sm">Technical Data Hub</div>
+                      <div className="p-4">
+                        <div className="bg-[#1e293b] text-[#e2e8f0] p-4 rounded-lg text-[10px] font-mono whitespace-pre-wrap border border-[#334155] shadow-inner max-h-[300px] overflow-y-auto custom-scrollbar text-left">
+                          {JSON.stringify(selectedOrder, null, 2)}
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
                 </div>
               </div>
             </div>
@@ -499,3 +580,55 @@ export default function OrdersPage() {
   );
 }
 
+function SpecItem({ label, value, mono, muted, small }: any) {
+  return (
+    <div className="spec-item">
+      <label className="block text-[10px] text-slate-400 uppercase tracking-wider mb-0.5 font-bold">{label}</label>
+      <span className={`${mono ? 'font-mono' : 'font-medium'} ${muted ? 'text-slate-400' : 'text-[#0f172a]'} ${small ? 'text-xs' : 'text-sm'} block truncate`}>
+        {value || (muted ? 'null' : 'N/A')}
+      </span>
+    </div>
+  );
+}
+
+function FinancialRow({ label, value, success, plain }: any) {
+  return (
+    <tr className="border-b border-slate-50 last:border-0">
+      <td className="py-3 text-slate-500 text-xs">{label}</td>
+      <td className={`py-3 text-right font-mono text-xs ${success ? 'text-green-600 font-bold' : plain ? 'text-slate-700' : 'text-[#0f172a] font-semibold'}`}>
+        {value}
+      </td>
+    </tr>
+  );
+}
+
+function DataPoint({ label, value, mono }: { label: string, value: any, mono?: boolean }) {
+  return (
+    <div>
+      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{label}</p>
+      <p className={`text-sm font-bold text-gray-700 truncate ${mono ? 'font-mono' : ''}`}>{value || 'N/A'}</p>
+    </div>
+  );
+}
+
+function Badge({ label, value, color }: { label: string, value: string, color?: string }) {
+  if (!value) return null;
+  return (
+    <div className={`px-3 py-1 rounded-xl border border-gray-100 flex flex-col ${color || 'bg-white'}`}>
+      <span className="text-[8px] font-black text-gray-400 uppercase leading-none mb-0.5">{label}</span>
+      <span className="text-xs font-bold truncate">{value}</span>
+    </div>
+  );
+}
+
+function DetailBlock({ label, value, primary, highlight, color, mono, small }: any) {
+  
+  return (
+    <div className={`p-4 rounded-2xl border border-gray-100 ${highlight ? color : 'bg-gray-50'}`}>
+      <p className={`text-[9px] font-black uppercase tracking-widest mb-1 ${highlight ? 'text-current opacity-70' : 'text-gray-400'}`}>{label}</p>
+      <p className={`font-bold truncate ${primary ? 'text-blue-600 text-sm' : highlight ? 'text-current text-xs' : 'text-gray-700 text-xs'} ${mono ? 'font-mono' : ''} ${small ? 'text-[10px]' : ''}`}>
+        {value || 'N/A'}
+      </p>
+    </div>
+  );
+}
