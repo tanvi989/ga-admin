@@ -33,7 +33,7 @@ export async function GET(request: Request) {
         const gcsFiles = files.map(file => ({
           name: file.name.split('/').filter(Boolean).pop(),
           isDirectory: file.name.endsWith('/'),
-          size: parseInt(file.metadata.size || '0'),
+          size: parseInt(String(file.metadata.size || '0')),
           updatedAt: file.metadata.updated || new Date().toISOString(),
           url: `https://storage.googleapis.com/${BUCKET_NAME}/${file.name}`
         })).filter(f => f.name); // Remove empty names (the folder itself)
