@@ -7,6 +7,8 @@ export async function GET(request: Request) {
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '50');
     const status = searchParams.get('status') || '';
+    const dateRange = searchParams.get('dateRange') || '';
+    const search = searchParams.get('search') || '';
     const skip = (page - 1) * limit;
 
     // Check environment variable first
@@ -22,20 +24,77 @@ export async function GET(request: Request) {
 
     const db = await getDatabase();
     
-    const query: any = {};
+    const andFilters: any[] = [];
+    
     if (status) {
-      query.$or = [
-        { order_status: status },
-        { payment_status: status }
-      ];
+      andFilters.push({
+        $or: [
+          { order_status: status },
+          { payment_status: status }
+        ]
+      });
     }
+
+    if (dateRange) {
+      const now = new Date();
+      let startDate: Date | null = null;
+      let endDate: Date | null = null;
+
+      if (dateRange === 'today') {
+        // Start of today in UTC
+        startDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+        // End of today in UTC
+        endDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
+      } else if (dateRange === '7days') {
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      } else if (dateRange === '30days') {
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      } else {
+        // Specific date format YYYY-MM-DD
+        const customDate = new Date(dateRange);
+        if (!isNaN(customDate.getTime())) {
+          startDate = new Date(Date.UTC(customDate.getUTCFullYear(), customDate.getUTCMonth(), customDate.getUTCDate(), 0, 0, 0, 0));
+          endDate = new Date(Date.UTC(customDate.getUTCFullYear(), customDate.getUTCMonth(), customDate.getUTCDate(), 23, 59, 59, 999));
+        }
+      }
+
+      if (startDate) {
+        const dateQuery: any = { $gte: startDate.toISOString() };
+        if (endDate) {
+          dateQuery.$lte = endDate.toISOString();
+        }
+
+        andFilters.push({
+          $or: [
+            { created_at: dateQuery },
+            { created: dateQuery },
+            // Also try matching as Date objects just in case
+            { created_at: { $gte: startDate, $lte: endDate || new Date() } },
+            { created: { $gte: startDate, $lte: endDate || new Date() } }
+          ]
+        });
+      }
+    }
+
+    if (search) {
+      andFilters.push({
+        $or: [
+          { order_id: { $regex: search, $options: 'i' } },
+          { user_id: { $regex: search, $options: 'i' } },
+          { user_email: { $regex: search, $options: 'i' } },
+          { customer_email: { $regex: search, $options: 'i' } }
+        ]
+      });
+    }
+
+    const query = andFilters.length > 0 ? { $and: andFilters } : {};
 
     const collection = db.collection('orders');
     const totalCount = await collection.countDocuments(query);
     
     const orders = await collection
       .find(query)
-      .sort({ created: -1 })
+      .sort({ created_at: -1, created: -1 })
       .skip(skip)
       .limit(limit)
       .toArray();

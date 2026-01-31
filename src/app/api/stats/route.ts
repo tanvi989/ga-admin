@@ -51,7 +51,7 @@ export async function GET() {
       db.collection('payments').countDocuments({})
     ]);
 
-    // Optimized aggregation for total revenue and status counts
+    // Optimized aggregation for all analytics
     const aggregationResults = await db.collection('orders').aggregate([
       {
         $facet: {
@@ -79,13 +79,78 @@ export async function GET() {
                 count: { $sum: 1 }
               }
             }
+          ],
+          dailyStats: [
+            {
+              $addFields: {
+                dateObj: { 
+                  $toDate: { $ifNull: ["$created_at", { $ifNull: ["$created", new Date()] }] }
+                }
+              }
+            },
+            {
+              $match: {
+                dateObj: { $gte: new Date(new Date().setUTCHours(0, 0, 0, 0) - 30 * 24 * 60 * 60 * 1000) }
+              }
+            },
+            {
+              $group: {
+                _id: { $dateToString: { format: "%Y-%m-%d", date: "$dateObj", timezone: "UTC" } },
+                revenue: { $sum: { $convert: { input: { $ifNull: ["$order_total", { $ifNull: ["$total", 0] }] }, to: "double", onError: 0, onNull: 0 } } },
+                orders: { $sum: 1 }
+              }
+            },
+            { $sort: { _id: 1 } }
+          ],
+          monthlyStats: [
+            {
+              $addFields: {
+                dateObj: { 
+                  $toDate: { $ifNull: ["$created_at", { $ifNull: ["$created", new Date()] }] }
+                }
+              }
+            },
+            {
+              $match: {
+                dateObj: { $gte: new Date(new Date().setUTCFullYear(new Date().getUTCFullYear() - 1)) }
+              }
+            },
+            {
+              $group: {
+                _id: { $dateToString: { format: "%Y-%m", date: "$dateObj", timezone: "UTC" } },
+                revenue: { $sum: { $convert: { input: { $ifNull: ["$order_total", { $ifNull: ["$total", 0] }] }, to: "double", onError: 0, onNull: 0 } } },
+                orders: { $sum: 1 }
+              }
+            },
+            { $sort: { _id: 1 } }
+          ],
+          topProducts: [
+            { $unwind: "$items" },
+            {
+              $group: {
+                _id: { $ifNull: ["$items.skuid", "$items.product_id"] },
+                name: { $first: "$items.name" },
+                totalSold: { $sum: { $ifNull: ["$items.quantity", 1] } },
+                revenue: { 
+                  $sum: { 
+                    $multiply: [
+                      { $ifNull: ["$items.quantity", 1] }, 
+                      { $convert: { input: { $ifNull: ["$items.price", 0] }, to: "double", onError: 0, onNull: 0 } }
+                    ] 
+                  } 
+                }
+              }
+            },
+            { $sort: { totalSold: -1 } },
+            { $limit: 8 }
           ]
         }
       }
     ]).toArray();
 
-    const totalRevenue = aggregationResults[0]?.revenue[0]?.total || 0;
-    const ordersByStatus = aggregationResults[0]?.statusCounts.reduce((acc: any, curr: any) => {
+    const result = aggregationResults[0];
+    const totalRevenue = result?.revenue[0]?.total || 0;
+    const ordersByStatus = result?.statusCounts.reduce((acc: any, curr: any) => {
       acc[curr._id] = curr.count;
       return acc;
     }, {});
@@ -98,7 +163,10 @@ export async function GET() {
         usersCount,
         paymentsCount,
         totalRevenue: totalRevenue.toFixed(2),
-        ordersByStatus
+        ordersByStatus,
+        dailyStats: result?.dailyStats || [],
+        monthlyStats: result?.monthlyStats || [],
+        topProducts: result?.topProducts || []
       }
     }, {
       headers: {

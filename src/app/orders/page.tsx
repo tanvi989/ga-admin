@@ -37,15 +37,56 @@ export default function OrdersPage() {
   const [totalPages, setTotalPages] = useState(0);
   const [totalOrders, setTotalOrders] = useState(0);
   const [statusFilter, setStatusFilter] = useState('');
+  const [dateFilter, setDateFilter] = useState('');
+  const [customDate, setCustomDate] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+
+  const orderStatuses = [
+    'Pending',
+    'Confirmed',
+    'Processing',
+    'Shipped',
+    'Out for Delivery',
+    'Delivered',
+    'Cancelled',
+    'Returned'
+  ];
 
   useEffect(() => {
     fetchOrders();
-  }, [page, statusFilter]);
+  }, [page, statusFilter, dateFilter, customDate, searchQuery]);
+
+  const handleStatusUpdate = async (orderId: string, newStatus: string) => {
+    setUpdatingStatus(true);
+    try {
+      const res = await fetch('/api/orders/status', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId, status: newStatus })
+      });
+      const data = await res.json();
+      if (data.success) {
+        // Update local state
+        setOrders(orders.map(o => (o.order_id === orderId || o._id === orderId) ? { ...o, order_status: newStatus } : o));
+        if (selectedOrder && (selectedOrder.order_id === orderId || selectedOrder._id === orderId)) {
+          setSelectedOrder({ ...selectedOrder, order_status: newStatus });
+        }
+      } else {
+        alert(data.error || 'Failed to update status');
+      }
+    } catch (err) {
+      alert('Error updating status');
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
 
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/orders?page=${page}&limit=${limit}&status=${statusFilter}`);
+      const dateParam = dateFilter === 'custom' ? customDate : dateFilter;
+      const response = await fetch(`/api/orders?page=${page}&limit=${limit}&status=${statusFilter}&dateRange=${dateParam}&search=${searchQuery}`);
       
       // Check if response is JSON
       const contentType = response.headers.get('content-type');
@@ -83,13 +124,16 @@ export default function OrdersPage() {
   const getStatusColor = (status: string | undefined) => {
     if (!status) return 'bg-gray-100 text-gray-800';
     const s = status.toLowerCase();
-    if (s.includes('success') || s.includes('completed') || s.includes('paid')) {
+    if (s.includes('success') || s.includes('completed') || s.includes('paid') || s.includes('delivered')) {
       return 'bg-green-100 text-green-800';
     }
-    if (s.includes('pending')) {
-      return 'bg-yellow-100 text-yellow-800';
+    if (s.includes('pending') || s.includes('processing') || s.includes('confirmed')) {
+      return 'bg-blue-100 text-blue-800';
     }
-    if (s.includes('failed') || s.includes('cancelled')) {
+    if (s.includes('shipped') || s.includes('delivery')) {
+      return 'bg-purple-100 text-purple-800';
+    }
+    if (s.includes('failed') || s.includes('cancelled') || s.includes('returned')) {
       return 'bg-red-100 text-red-800';
     }
     return 'bg-gray-100 text-gray-800';
@@ -113,8 +157,43 @@ export default function OrdersPage() {
     <AdminLayout>
       <div className="px-4 py-6 sm:px-0">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-          <h2 className="text-2xl font-bold text-gray-900">Orders ({totalOrders})</h2>
-          <div className="flex gap-2 w-full md:w-auto">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-2xl font-bold text-gray-900">Orders ({totalOrders})</h2>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search by Order ID..."
+                value={searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
+                className="pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 bg-white text-sm w-full md:w-64 outline-none"
+              />
+              <svg className="w-4 h-4 text-gray-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2 w-full md:w-auto">
+            <select
+              value={dateFilter}
+              onChange={(e) => { setDateFilter(e.target.value); setPage(1); }}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-sm"
+            >
+              <option value="">Any Time</option>
+              <option value="today">Today</option>
+              <option value="7days">Last 7 Days</option>
+              <option value="30days">Last 30 Days</option>
+              <option value="custom">Specific Date</option>
+            </select>
+
+            {dateFilter === 'custom' && (
+              <input
+                type="date"
+                value={customDate}
+                onChange={(e) => { setCustomDate(e.target.value); setPage(1); }}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-sm"
+              />
+            )}
+
             <select
               value={statusFilter}
               onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
@@ -199,9 +278,18 @@ export default function OrdersPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(order.order_status)}`}>
-                          {order.order_status || 'N/A'}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <select 
+                            disabled={updatingStatus}
+                            value={order.order_status || 'Pending'}
+                            onChange={(e) => handleStatusUpdate(order.order_id || order._id, e.target.value)}
+                            className={`px-2 py-1 text-xs leading-5 font-semibold rounded-full border-none appearance-none cursor-pointer focus:ring-2 focus:ring-blue-500 ${getStatusColor(order.order_status)}`}
+                          >
+                            {orderStatuses.map(s => (
+                              <option key={s} value={s} className="bg-white text-gray-900">{s}</option>
+                            ))}
+                          </select>
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {formatDate(order.created)}
@@ -255,9 +343,26 @@ export default function OrdersPage() {
                   <h1 className="text-2xl font-bold text-[#0f172a]">
                     Order Details: <span className="font-mono text-blue-600 tracking-tighter">{selectedOrder.order_id || selectedOrder._id}</span>
                   </h1>
-                  <div className="flex gap-2 mt-2">
-                    <span className="px-2 py-1 rounded bg-[#dcfce7] text-[#166534] text-[10px] font-bold uppercase tracking-wider">{selectedOrder.order_status || 'Confirmed'}</span>
+                  <div className="flex flex-wrap gap-2 mt-2 items-center">
+                    <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${getStatusColor(selectedOrder.order_status)}`}>
+                      {selectedOrder.order_status || 'Pending'}
+                    </span>
                     <span className="px-2 py-1 rounded bg-[#fef3c7] text-[#92400e] text-[10px] font-bold uppercase tracking-wider">Payment: {selectedOrder.payment_status || 'Pending'}</span>
+                    
+                    <div className="flex items-center gap-2 ml-4">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Update Status:</p>
+                      <select 
+                        disabled={updatingStatus}
+                        value={selectedOrder.order_status || 'Pending'}
+                        onChange={(e) => handleStatusUpdate(selectedOrder.order_id || selectedOrder._id, e.target.value)}
+                        className="bg-slate-50 border border-slate-200 text-[10px] font-bold uppercase rounded px-2 py-1 outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+                      >
+                        {orderStatuses.map(s => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                      {updatingStatus && <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>}
+                    </div>
                   </div>
                 </div>
                 <div className="text-left md:text-right space-y-1">
